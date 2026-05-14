@@ -14,6 +14,20 @@ TL;DR: Reproduce the paper’s main order-fairness experiment from arXiv:2605.11
 2. Load code into Kaggle.
     - Option A: Upload this workspace as a Kaggle Dataset and attach it.
     - Option B: Clone your Git repository directly in the notebook.
+      - Set project and cache paths before running data/model downloads:
+         ```python
+         import os
+         import sys
+
+         PROJECT_ROOT = '/kaggle/working/LLM-Bias'
+         HF_CACHE = '/kaggle/working/hf_cache'
+
+         os.environ['HF_HOME'] = HF_CACHE
+         os.environ['HF_DATASETS_CACHE'] = f'{HF_CACHE}/datasets'
+         os.environ['TRANSFORMERS_CACHE'] = f'{HF_CACHE}/transformers'
+
+         sys.path.append(f'{PROJECT_ROOT}/src')
+         ```
     - Ensure the Python path includes `src`:
        - `import sys; sys.path.append('/kaggle/working/LLM-Bias/src')`
 3. Install dependencies.

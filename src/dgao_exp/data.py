@@ -113,15 +113,10 @@ def _load_hf_dataset(config: ExperimentConfig):
     if ds_name in {"squad_v2", "squadv2", "squad2"}:
         return load_dataset("squad_v2", cache_dir=config.cache_dir)
     if ds_name in {"searchqa", "search_qa", "cm17k"}:
-        if not config.local_dataset_path:
-            raise ValueError(
-                "Dataset requires local jsonl path. Set local_dataset_path in config for "
-                f"{config.dataset_name}."
-            )
-        return {
-            config.train_split_name: Dataset.from_json(str(config.local_dataset_path)),
-            config.eval_split_name: Dataset.from_json(str(config.local_dataset_path)),
-        }
+        raise ValueError(
+            f"Dataset {config.dataset_name} is intentionally disabled in this codebase. "
+            "Use one of: sst2, gsm8k, squad_v2."
+        )
     raise ValueError(f"Unsupported dataset_name: {config.dataset_name}")
 
 
@@ -248,12 +243,18 @@ def _build_squad_variants(
 
 
 def build_grouped_examples(config: ExperimentConfig) -> Tuple[List[VariantExample], List[VariantExample]]:
+    name = config.dataset_name.lower()
+    if name in {"searchqa", "search_qa", "cm17k"}:
+        raise ValueError(
+            f"Dataset {config.dataset_name} is intentionally disabled in grouped data construction. "
+            "Use one of: sst2, gsm8k, squad_v2."
+        )
+
     ds = _load_hf_dataset(config)
     train_split = list(ds[config.train_split_name])
     eval_split_name = _choose_eval_split(ds, config.eval_split_name)
     eval_split = list(ds[eval_split_name])
 
-    name = config.dataset_name.lower()
     if name == "sst2":
         train = _build_sst2_variants(
             split_rows=train_split,
