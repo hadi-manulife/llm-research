@@ -43,6 +43,7 @@ class ExperimentConfig:
     top_p: float = 1.0
     dgao_steps: int = 200
     dgao_groups_per_step: int = 4
+    dgao_reference_device: str = "cpu"  # cpu | cuda | auto
 
     # Runtime
     device: str = "auto"  # auto | cuda | cpu

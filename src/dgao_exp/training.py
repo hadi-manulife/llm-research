@@ -25,6 +25,14 @@ def _resolve_device(config: ExperimentConfig) -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+def _resolve_aux_device(value: str) -> torch.device:
+    if value == "cpu":
+        return torch.device("cpu")
+    if value == "cuda":
+        return torch.device("cuda")
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 def set_seed(seed: int) -> None:
     random.seed(seed)
     torch.manual_seed(seed)
@@ -49,6 +57,8 @@ def load_model_and_tokenizer(config: ExperimentConfig):
     )
     if config.gradient_checkpointing:
         model.gradient_checkpointing_enable()
+        if hasattr(model.config, "use_cache"):
+            model.config.use_cache = False
     return model, tokenizer
 
 
@@ -232,10 +242,18 @@ def run_dgao_training(
 
     # Warm start with standard SFT on half of grouped augmented samples.
     warm_stats = run_sft_training(model, tokenizer, config, warm_data)
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
 
     # Reference model for KL regularization.
-    reference = AutoModelForCausalLM.from_pretrained(config.model_name, cache_dir=config.cache_dir)
-    reference.to(device)
+    ref_device = _resolve_aux_device(config.dgao_reference_device)
+    ref_dtype = torch.float16 if ref_device.type == "cuda" and config.mixed_precision else torch.float32
+    reference = AutoModelForCausalLM.from_pretrained(
+        config.model_name,
+        cache_dir=config.cache_dir,
+        torch_dtype=ref_dtype,
+    )
+    reference.to(ref_device)
     reference.eval()
     for p in reference.parameters():
         p.requires_grad = False
@@ -275,7 +293,8 @@ def run_dgao_training(
 
             logp_policy = _logprob_of_response(model, tokenizer, ex.prompt, pred, config, device)
             with torch.no_grad():
-                logp_ref = _logprob_of_response(reference, tokenizer, ex.prompt, pred, config, device)
+                logp_ref = _logprob_of_response(reference, tokenizer, ex.prompt, pred, config, ref_device)
+                logp_ref = logp_ref.to(logp_policy.device)
             kl_term = (logp_policy - logp_ref)
 
             # REINFORCE-style objective with KL penalty.
